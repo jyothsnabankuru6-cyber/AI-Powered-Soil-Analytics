@@ -1,0 +1,56 @@
+AI-POWERED SOIL ANALYTICS FOR CROP MANAGEMENT
+Dataset Inventory
+
+1. Structured Dataset
+Dataset Name: Crop and Fertilizer Recommendation Dataset
+Source: Kaggle
+Records: 2,200
+Columns: 13
+Format: CSV
+License: CC0 – Public Domain
+
+Main Features:
+- Nitrogen (N)
+- Phosphorus (P)
+- Potassium (K)
+- Temperature
+- Humidity
+- pH
+- Rainfall
+
+Target/Recommendation Information:
+- Crop label
+- Fertilizer
+- N status
+- P status
+- K status
+- Recommendation note
+
+Number of Crop Classes: 22
+Number of Fertilizer Categories: 5
+
+Initial Data Checks:
+- Missing values: 0
+- Duplicate records: 0
+- Invalid basic numerical values: 0
+
+2. Soil Image Dataset
+Dataset Name: Soil Classification Dataset
+Source: GitHub
+Format: JPG/PNG images
+Number of Soil Classes: 7
+License: CC BY-NC 4.0
+
+Soil Classes:
+- Alluvial Soil: 52 images
+- Arid Soil: 284 images
+- Black Soil: 255 images
+- Laterite Soil: 219 images
+- Mountain Soil: 201 images
+- Red Soil: 109 images
+- Yellow Soil: 69 images
+
+Purpose:
+The image dataset will be used for soil-type classification and
+will be considered along with structured soil data for the
+AI-powered soil analytics system.
