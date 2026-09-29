@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   // Input states
@@ -12,9 +12,42 @@ export default function Home() {
   const [potassium, setPotassium] = useState("");
   const [ph, setPh] = useState("");
 
+  // Voice assistance
+const [language, setLanguage] = useState("en-IN");
+const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+const [selectedVoice, setSelectedVoice] = useState("");
+
+useEffect(() => {
+  const loadVoices = () => {
+    setVoices(window.speechSynthesis.getVoices());
+  };
+
+  loadVoices();
+
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+
+  return () => {
+    window.speechSynthesis.onvoiceschanged = null;
+  };
+}, []);
   // Recommendation result
   const [result, setResult] = useState<any>(null);
 
+  // Logged-in user
+const [user, setUser] = useState<any>(null);
+
+useEffect(() => {
+  const savedUser = localStorage.getItem("soilSmartUser");
+
+  if (savedUser) {
+    setUser(JSON.parse(savedUser));
+  }
+}, []);
+
+const logout = () => {
+  localStorage.removeItem("soilSmartUser");
+  setUser(null);
+};
   // Soil analysis function
   const analyzeSoil = () => {
     const n = Number(nitrogen);
@@ -237,6 +270,70 @@ setResult({
 });
   };
 
+
+  // Voice assistant
+const speakAnalysis = () => {
+  if (!result) {
+    alert("Please analyze the soil first.");
+    return;
+  }
+
+  let speechText = "";
+
+  if (language === "te-IN") {
+    speechText =
+      `మీ నేల ఆరోగ్య స్కోర్ ${result.score} శాతం. ` +
+      `నేల ఆరోగ్య స్థితి ${result.healthStatus}. ` +
+      `నైట్రోజన్ స్థితి ${result.nStatus}. ` +
+      `ఫాస్ఫరస్ స్థితి ${result.pStatus}. ` +
+      `పొటాషియం స్థితి ${result.kStatus}. ` +
+      `సిఫార్సు చేసిన పంట ${result.recommendedCrop}. ` +
+      `పంట అనుకూలత ${result.cropSuitability} శాతం. ` +
+      `సిఫార్సు చేసిన ఎరువు ${result.fertilizer}. ` +
+      `${result.phRecommendation}`;
+  } else if (language === "hi-IN") {
+    speechText =
+      `आपकी मिट्टी का स्वास्थ्य स्कोर ${result.score} प्रतिशत है। ` +
+      `मिट्टी की स्वास्थ्य स्थिति ${result.healthStatus} है। ` +
+      `नाइट्रोजन की स्थिति ${result.nStatus} है। ` +
+      `फॉस्फोरस की स्थिति ${result.pStatus} है। ` +
+      `पोटैशियम की स्थिति ${result.kStatus} है। ` +
+      `अनुशंसित फसल ${result.recommendedCrop} है। ` +
+      `फसल की उपयुक्तता ${result.cropSuitability} प्रतिशत है। ` +
+      `अनुशंसित उर्वरक ${result.fertilizer} है। ` +
+      `${result.phRecommendation}`;
+  } else {
+    speechText =
+      `Your soil health score is ${result.score} out of 100. ` +
+      `The soil health status is ${result.healthStatus}. ` +
+      `Nitrogen status is ${result.nStatus}. ` +
+      `Phosphorus status is ${result.pStatus}. ` +
+      `Potassium status is ${result.kStatus}. ` +
+      `The recommended crop is ${result.recommendedCrop}. ` +
+      `Crop suitability is ${result.cropSuitability} percent. ` +
+      `The recommended fertilizer is ${result.fertilizer}. ` +
+      `${result.phRecommendation}`;
+  }
+
+  const speech = new SpeechSynthesisUtterance(speechText);
+
+  speech.lang = language;
+
+  const voice = voices.find(
+    (voice) => voice.name === selectedVoice
+  );
+
+  if (voice) {
+    speech.voice = voice;
+  }
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(speech);
+};
+
+const stopSpeaking = () => {
+  window.speechSynthesis.cancel();
+};
   return (
     <main className="min-h-screen bg-green-50 text-gray-900">
 
@@ -247,30 +344,55 @@ setResult({
           <h1 className="text-2xl font-bold">
             🌱 SoilSmart
           </h1>
+        <nav className="flex items-center gap-4">
 
-          <nav className="space-x-6 hidden md:block">
-            <a
-              href="#"
-              className="hover:text-green-200"
-            >
-              Home
-            </a>
+  <a
+    href="#"
+    className="hover:text-green-200"
+  >
+    Home
+  </a>
 
-            <a
-              href="#soil-form"
-              className="hover:text-green-200"
-            >
-              Recommendations
-            </a>
+  <a
+    href="#soil-form"
+    className="hover:text-green-200"
+  >
+    Recommendations
+  </a>
 
-            <a
-              href="#about"
-              className="hover:text-green-200"
-            >
-              About
-            </a>
-          </nav>
+  <a
+    href="#about"
+    className="hover:text-green-200"
+  >
+    About
+  </a>
 
+  {user ? (
+    <div className="flex items-center gap-3">
+
+      <div className="bg-white text-green-800 px-4 py-2 rounded-lg font-semibold">
+        👤 {user.name}
+      </div>
+
+      <button
+        onClick={logout}
+        className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition"
+      >
+        Logout
+      </button>
+
+    </div>
+  ) : (
+    <a
+      href="/login"
+      className="bg-white text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-100 transition"
+    >
+      🔐 Login
+    </a>
+  )}
+
+</nav>
+  
         </div>
       </header>
 
@@ -556,8 +678,94 @@ setResult({
             Analyze Soil 🌱
           </button>
 
-        </div>
-      </section>
+{/* Voice Assistant */}
+<div className="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-200">
+
+  <h3 className="text-xl font-bold text-blue-800">
+    🎤 Voice Assistant
+  </h3>
+
+  <p className="text-gray-700 mt-2">
+    Listen to your soil analysis in your preferred language and voice.
+  </p>
+
+  <div className="grid md:grid-cols-2 gap-4 mt-4">
+
+    {/* Language */}
+    <div>
+      <label className="block font-semibold text-gray-800 mb-2">
+        🌐 Language
+      </label>
+
+      <select
+        value={language}
+        onChange={(e) => {
+          setLanguage(e.target.value);
+          setSelectedVoice("");
+        }}
+        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 bg-white"
+      >
+        <option value="en-IN">English</option>
+        <option value="te-IN">తెలుగు (Telugu)</option>
+        <option value="hi-IN">हिन्दी (Hindi)</option>
+      </select>
+    </div>
+
+    {/* Voice */}
+    <div>
+      <label className="block font-semibold text-gray-800 mb-2">
+        🗣️ Voice
+      </label>
+
+      <select
+        value={selectedVoice}
+        onChange={(e) => setSelectedVoice(e.target.value)}
+        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 bg-white"
+      >
+        <option value="">
+          Default Voice
+        </option>
+
+        {voices
+          .filter((voice) =>
+            voice.lang
+              .toLowerCase()
+              .startsWith(language.split("-")[0])
+          )
+          .map((voice) => (
+            <option key={voice.name} value={voice.name}>
+              {voice.name}
+            </option>
+          ))}
+      </select>
+    </div>
+
+  </div>
+
+  <div className="flex gap-3 mt-5">
+
+    <button
+      onClick={speakAnalysis}
+      className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+    >
+      🔊 Speak Analysis
+    </button>
+
+    <button
+      onClick={stopSpeaking}
+      className="px-6 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition"
+    >
+      ⛔ Stop
+    </button>
+
+  </div>
+
+</div>
+
+</div>
+</section>
+
+{/* Recommendation Results */}
 
       {/* Recommendation Results */}
       {result && (
