@@ -16,7 +16,10 @@ export default function Home() {
 const [language, setLanguage] = useState("en-IN");
 const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 const [selectedVoice, setSelectedVoice] = useState("");
-
+const [isListening, setIsListening] = useState(false);
+const [voiceText, setVoiceText] = useState("");
+const [soilImage, setSoilImage] = useState<string | null>(null);
+const [detectedSoilType, setDetectedSoilType] = useState("");
 useEffect(() => {
   const loadVoices = () => {
     setVoices(window.speechSynthesis.getVoices());
@@ -32,7 +35,7 @@ useEffect(() => {
 }, []);
   // Recommendation result
   const [result, setResult] = useState<any>(null);
-
+const [history, setHistory] = useState<any[]>([]);
   // Logged-in user
 const [user, setUser] = useState<any>(null);
 
@@ -41,6 +44,12 @@ useEffect(() => {
 
   if (savedUser) {
     setUser(JSON.parse(savedUser));
+  }
+
+  const savedHistory = localStorage.getItem("soilAnalysisHistory");
+
+  if (savedHistory) {
+    setHistory(JSON.parse(savedHistory));
   }
 }, []);
 
@@ -255,19 +264,49 @@ if (improvements.length === 0) {
   );
 }
   // Store all analysis results
-setResult({
+const analysis = {
+  id: Date.now(),
+  date: new Date().toLocaleString(),
+
+  soilType,
+  crop,
+
+  nitrogen,
+  phosphorus,
+  potassium,
+  ph,
+
   nStatus,
   pStatus,
   kStatus,
+
   fertilizer,
   phRecommendation,
+
   score,
   healthStatus,
+
   recommendedCrop,
   cropSuitability,
+
   improvements,
   topCrops,
-});
+};
+
+setResult(analysis);
+
+setTimeout(() => {
+  speakAnalysis();
+}, 500);
+// Save analysis to history
+const updatedHistory = [analysis, ...history];
+
+setHistory(updatedHistory);
+
+localStorage.setItem(
+  "soilAnalysisHistory",
+  JSON.stringify(updatedHistory)
+);
   };
 
 
@@ -330,6 +369,312 @@ const speakAnalysis = () => {
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(speech);
 };
+const startVoiceInput = () => {
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Voice input is not supported in this browser.");
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+
+  recognition.lang = language;
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  setIsListening(true);
+
+  recognition.onstart = () => {
+    setVoiceText("🎤 Listening...");
+  };
+
+  recognition.onresult = (event: any) => {
+  const text = event.results[0][0].transcript;
+
+  setVoiceText(text);
+  setIsListening(false);
+
+  console.log("Voice Input:", text);
+
+  // Extract Nitrogen
+  const nitrogenMatch = text.match(/nitrogen\s*(?:is|=|:)?\s*(\d+(?:\.\d+)?)/i);
+
+  // Extract Phosphorus
+  const phosphorusMatch = text.match(/phosphorus\s*(?:is|=|:)?\s*(\d+(?:\.\d+)?)/i);
+
+  // Extract Potassium
+  const potassiumMatch = text.match(/potassium\s*(?:is|=|:)?\s*(\d+(?:\.\d+)?)/i);
+
+  // Extract pH
+  const phMatch = text.match(/p\s*h\s*(?:is|=|:)?\s*(\d+(?:\.\d+)?)/i);
+
+  if (nitrogenMatch) {
+    setNitrogen(nitrogenMatch[1]);
+  }
+
+  if (phosphorusMatch) {
+    setPhosphorus(phosphorusMatch[1]);
+  }
+
+  if (potassiumMatch) {
+    setPotassium(potassiumMatch[1]);
+  }
+
+  if (phMatch) {
+    setPh(phMatch[1]);
+  }
+};
+
+  recognition.onerror = (event: any) => {
+    console.error("Speech recognition error:", event.error);
+    setVoiceText("❌ Could not understand. Please try again.");
+    setIsListening(false);
+  };
+
+  recognition.onend = () => {
+    setIsListening(false);
+  };
+
+  recognition.start();
+};
+const downloadReport = () => {
+  if (!result) {
+    alert("Please analyze the soil first.");
+    return;
+  }
+
+  const reportWindow = window.open("", "_blank");
+
+  if (!reportWindow) {
+    alert("Please allow pop-ups to generate the report.");
+    return;
+  }
+
+  reportWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>SoilSmart Soil Analysis Report</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 40px;
+          color: #1f2937;
+        }
+
+        .header {
+          text-align: center;
+          border-bottom: 3px solid #15803d;
+          padding-bottom: 20px;
+          margin-bottom: 25px;
+        }
+
+        .header h1 {
+          color: #166534;
+          margin-bottom: 5px;
+        }
+
+        .header p {
+          color: #6b7280;
+        }
+
+        .section {
+          margin-top: 25px;
+        }
+
+        .section h2 {
+          color: #166534;
+          border-bottom: 1px solid #d1d5db;
+          padding-bottom: 6px;
+        }
+
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .card {
+          background: #f0fdf4;
+          padding: 15px;
+          border-radius: 8px;
+          border: 1px solid #bbf7d0;
+        }
+
+        .score {
+          font-size: 32px;
+          font-weight: bold;
+          color: #15803d;
+        }
+
+        .crop {
+          font-size: 24px;
+          font-weight: bold;
+          color: #166534;
+        }
+
+        .footer {
+          margin-top: 40px;
+          text-align: center;
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        @media print {
+          body {
+            margin: 20px;
+          }
+
+          button {
+            display: none;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="header">
+        <h1>🌱 SoilSmart</h1>
+        <h2>AI-Powered Soil Analysis Report</h2>
+        <p>Generated on ${new Date().toLocaleString()}</p>
+      </div>
+
+      <div class="section">
+        <h2>🌾 Soil Details</h2>
+
+        <div class="grid">
+          <div class="card">
+            <strong>Soil Type</strong>
+            <p>${result.soilType}</p>
+          </div>
+
+          <div class="card">
+            <strong>Preferred Crop</strong>
+            <p>${result.crop}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🧪 Nutrient Analysis</h2>
+
+        <div class="grid">
+          <div class="card">
+            <strong>Nitrogen (N)</strong>
+            <p>${result.nitrogen}</p>
+            <strong>Status:</strong> ${result.nStatus}
+          </div>
+
+          <div class="card">
+            <strong>Phosphorus (P)</strong>
+            <p>${result.phosphorus}</p>
+            <strong>Status:</strong> ${result.pStatus}
+          </div>
+
+          <div class="card">
+            <strong>Potassium (K)</strong>
+            <p>${result.potassium}</p>
+            <strong>Status:</strong> ${result.kStatus}
+          </div>
+
+          <div class="card">
+            <strong>Soil pH</strong>
+            <p>${result.ph
+
+            }</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>💚 Soil Health</h2>
+
+        <div class="card">
+          <p class="score">${result.score}%</p>
+          <p><strong>Status:</strong> ${result.healthStatus}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🌾 Crop Recommendation</h2>
+
+        <div class="card">
+          <p class="crop">${result.recommendedCrop}</p>
+          <p>
+            <strong>Crop Suitability:</strong>
+            ${result.cropSuitability}%
+          </p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🧴 Fertilizer Recommendation</h2>
+
+        <div class="card">
+          <p>${result.fertilizer}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🌱 pH Recommendation</h2>
+
+        <div class="card">
+          <p>${result.phRecommendation}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>💡 Soil Improvement Suggestions</h2>
+
+        <div class="card">
+          <p>${result.improvements}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🏆 Top Crop Recommendations</h2>
+
+        <div class="card">
+          ${result.topCrops
+            .map(
+              (
+                item: { crop: string; score: number },
+                index: number
+              ) => `
+                <p>
+                  <strong>#${index + 1}</strong>
+                  ${item.crop}
+                  — ${item.score}%
+                </p>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Generated by SoilSmart — AI-Powered Soil Analytics</p>
+        <p>This report is intended as a decision-support tool.</p>
+      </div>
+
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      </script>
+
+    </body>
+    </html>
+  `);
+
+  reportWindow.document.close();
+};  
+
 
 const stopSpeaking = () => {
   window.speechSynthesis.cancel();
@@ -595,6 +940,56 @@ const stopSpeaking = () => {
 
           </div>
 
+{/* Soil Image Analysis */}
+<div className="mb-6">
+  <label className="block font-semibold mb-2 text-gray-700">
+    📸 Upload Soil Image
+  </label>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => {
+  const file = e.target.files?.[0];
+
+  if (file) {
+    const imageUrl = URL.createObjectURL(file);
+    setSoilImage(imageUrl);
+  }
+}}
+    className="w-full border border-gray-300 rounded-lg p-3 bg-white"
+  />
+
+{soilImage && (
+  <div className="mt-4">
+    <p className="font-semibold text-gray-700 mb-2">
+      🖼️ Selected Soil Image
+    </p>
+
+    <img
+      src={soilImage}
+      alt="Selected soil"
+      className="w-full max-w-md h-64 object-cover rounded-xl border-2 border-green-300 shadow-md"
+    />
+  </div>
+)}
+{detectedSoilType && (
+  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+    <p className="text-sm text-green-700 font-semibold">
+      🤖 AI Soil Classification
+    </p>
+
+    <p className="text-2xl font-bold text-green-800 mt-1">
+      🌱 {detectedSoilType}
+    </p>
+  </div>
+)}
+
+  <p className="text-sm text-gray-500 mt-2">
+    Upload a clear image of your soil for soil-type analysis.
+  </p>
+</div>
+
           {/* N P K */}
           <div className="grid md:grid-cols-3 gap-5 mt-5">
 
@@ -757,9 +1152,26 @@ const stopSpeaking = () => {
     >
       ⛔ Stop
     </button>
+<button
+  onClick={startVoiceInput}
+  className="px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition"
+>
+  {isListening ? "🎤 Listening..." : "🎤 Voice Input"}
+</button>
 
   </div>
-
+{voiceText && (
+  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+    <p className="font-semibold text-green-800">🎤 Voice Input:</p>
+    <p className="text-gray-700 mt-1">{voiceText}</p>
+  </div>
+)}
+<button
+  onClick={downloadReport}
+  className="w-full mt-4 bg-green-700 text-white py-3 rounded-lg font-bold hover:bg-green-800 transition"
+>
+  🖨️ Generate PDF Report
+</button>
 </div>
 
 </div>
@@ -970,6 +1382,295 @@ const stopSpeaking = () => {
         </section>
       )}
 
+{/* Soil Health Dashboard */}
+{result && (
+  <section className="max-w-6xl mx-auto px-6 py-8">
+
+    <div className="bg-white rounded-2xl shadow-lg p-6">
+
+      <h2 className="text-2xl font-bold text-green-800 mb-2">
+        📊 Soil Health Dashboard
+      </h2>
+
+      <p className="text-gray-600 mb-6">
+        A visual summary of your soil nutrient condition.
+      </p>
+
+      {/* Nutrient Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        {/* Nitrogen */}
+        <div className="bg-blue-50 rounded-xl p-5 border border-blue-100">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">
+              🧪 Nitrogen (N)
+            </h3>
+
+            <span className="text-2xl font-bold text-blue-700">
+              {result.nitrogen}
+            </span>
+          </div>
+
+          <p className="mt-2 font-semibold text-gray-700">
+            Status: {result.nStatus}
+          </p>
+
+          <div className="w-full bg-gray-200 rounded-full h-3 mt-3">
+            <div
+              className="bg-blue-600 h-3 rounded-full"
+              style={{
+                width: `${Math.min((result.nitrogen / 120) * 100, 100)}%`,
+              }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Phosphorus */}
+        <div className="bg-purple-50 rounded-xl p-5 border border-purple-100">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">
+              🧪 Phosphorus (P)
+            </h3>
+
+            <span className="text-2xl font-bold text-purple-700">
+              {result.phosphorus}
+            </span>
+          </div>
+
+          <p className="mt-2 font-semibold text-gray-700">
+            Status: {result.pStatus}
+          </p>
+
+          <div className="w-full bg-gray-200 rounded-full h-3 mt-3">
+            <div
+              className="bg-purple-600 h-3 rounded-full"
+              style={{
+                width: `${Math.min((result.phosphorus / 100) * 100, 100)}%`,
+              }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Potassium */}
+        <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">
+              🧪 Potassium (K)
+            </h3>
+
+            <span className="text-2xl font-bold text-orange-700">
+              {result.potassium}
+            </span>
+          </div>
+
+          <p className="mt-2 font-semibold text-gray-700">
+            Status: {result.kStatus}
+          </p>
+
+          <div className="w-full bg-gray-200 rounded-full h-3 mt-3">
+            <div
+              className="bg-orange-500 h-3 rounded-full"
+              style={{
+                width: `${Math.min((result.potassium / 100) * 100, 100)}%`,
+              }}
+            ></div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Soil Health Score */}
+      <div className="mt-6 bg-green-50 rounded-xl p-6">
+
+        <div className="flex items-center justify-between">
+
+          <div>
+            <h3 className="text-xl font-bold text-green-800">
+              💚 Overall Soil Health
+            </h3>
+
+            <p className="text-gray-700 mt-1">
+              Current soil health condition
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-4xl font-bold text-green-700">
+              {result.score}%
+            </p>
+
+            <p className="font-semibold text-gray-700">
+              {result.healthStatus}
+            </p>
+          </div>
+
+        </div>
+
+        <div className="w-full bg-gray-200 rounded-full h-5 mt-5">
+          <div
+            className="bg-green-600 h-5 rounded-full transition-all duration-700"
+            style={{
+              width: `${result.score}%`,
+            }}
+          ></div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+)}
+
+{/* Analysis History */}
+<section className="max-w-6xl mx-auto px-6 py-12">
+
+  <div className="bg-white rounded-2xl shadow-lg p-6">
+
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <h2 className="text-2xl font-bold text-green-800">
+          📜 Analysis History
+        </h2>
+
+        <p className="text-gray-600 mt-1">
+          View your previous soil analysis results.
+        </p>
+      </div>
+
+      {history.length > 0 && (
+        <button
+          onClick={() => {
+            setHistory([]);
+            localStorage.removeItem("soilAnalysisHistory");
+          }}
+          className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition"
+        >
+          🗑️ Clear History
+        </button>
+      )}
+    </div>
+
+    {history.length === 0 ? (
+      <div className="text-center py-10 bg-green-50 rounded-xl">
+        <div className="text-5xl mb-3">🌱</div>
+
+        <p className="text-gray-700 font-semibold">
+          No previous analyses yet.
+        </p>
+
+        <p className="text-gray-500 mt-1">
+          Analyze your soil to create your first history record.
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-4">
+
+        {history.map((item: any, index: number) => (
+          <div
+            key={item.id}
+            className="border border-green-100 rounded-xl p-5 bg-green-50"
+          >
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+              <div>
+                <p className="text-sm text-gray-500">
+                  Analysis #{history.length - index}
+                </p>
+
+                <h3 className="text-lg font-bold text-green-800">
+                  🌾 {item.recommendedCrop}
+                </h3>
+
+                <p className="text-sm text-gray-600">
+                  {item.date}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg px-5 py-3 text-center shadow-sm">
+                <p className="text-sm text-gray-500">
+                  Soil Health
+                </p>
+
+                <p className="text-2xl font-bold text-green-700">
+                  {item.score}%
+                </p>
+
+                <p className="text-sm font-semibold text-gray-700">
+                  {item.healthStatus}
+                </p>
+              </div>
+
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-5">
+
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-gray-500">
+                  Nitrogen
+                </p>
+                <p className="font-bold text-gray-900">
+                  {item.nitrogen}
+                </p>
+                <p className="text-sm text-green-700">
+                  {item.nStatus}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-gray-500">
+                  Phosphorus
+                </p>
+                <p className="font-bold text-gray-900">
+                  {item.phosphorus}
+                </p>
+                <p className="text-sm text-green-700">
+                  {item.pStatus}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-gray-500">
+                  Potassium
+                </p>
+                <p className="font-bold text-gray-900">
+                  {item.potassium}
+                </p>
+                <p className="text-sm text-green-700">
+                  {item.kStatus}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-gray-500">
+                  Soil pH
+                </p>
+                <p className="font-bold text-gray-900">
+                  {item.ph}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-gray-500">
+                  Fertilizer
+                </p>
+                <p className="font-bold text-green-800">
+                  {item.fertilizer}
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+        ))}
+
+      </div>
+    )}
+
+  </div>
+
+</section>
       {/* About */}
       <section
         id="about"
